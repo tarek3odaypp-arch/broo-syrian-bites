@@ -1,4 +1,4 @@
-import { Bike, LogOut, MapPin, Phone, Package, CheckCircle2, Navigation } from "lucide-react";
+import { Bike, LogOut, MapPin, Phone, Package, CheckCircle2, Navigation, Wallet } from "lucide-react";
 import { useApp, formatSYP, type OrderStatus } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ const tone: Record<OrderStatus, string> = {
 };
 
 export function DriverDashboard() {
-  const { orders, updateOrderStatus, logout } = useApp();
+  const { orders, updateOrderStatus, logout, driverEarnings } = useApp();
   const active = orders.filter((o) => o.status !== "تم التسليم");
   const done = orders.filter((o) => o.status === "تم التسليم");
 
@@ -36,10 +36,11 @@ export function DriverDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Stat label="طلبات نشطة" value={active.length.toString()} />
           <Stat label="طلبات اليوم" value={orders.length.toString()} />
           <Stat label="تم التسليم" value={done.length.toString()} />
+          <Stat label="محفظتي" value={formatSYP(driverEarnings)} icon={Wallet} />
         </div>
 
         <section>
@@ -82,10 +83,12 @@ export function DriverDashboard() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, icon: Icon }: { label: string; value: string; icon?: any }) {
   return (
     <div className="bg-card border border-border rounded-2xl p-4 text-center shadow-soft">
-      <div className="text-2xl font-black text-primary">{value}</div>
+      <div className="text-2xl font-black text-primary inline-flex items-center gap-1.5 justify-center">
+        {Icon && <Icon className="w-5 h-5" />}{value}
+      </div>
       <div className="text-xs text-muted-foreground mt-1">{label}</div>
     </div>
   );
