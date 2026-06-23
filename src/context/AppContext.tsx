@@ -21,6 +21,21 @@ export type Restaurant = {
   tagline: string;
 };
 
+export type Category = { id: string; name: string; icon: string };
+
+export type ChatMessage = {
+  id: string;
+  from: "customer" | "support";
+  text: string;
+  at: string;
+};
+
+export type Settings = {
+  adminPassword: string;
+  driverPassword: string;
+  announcements: string[];
+};
+
 export type CartItem = { product: Product; qty: number };
 
 export type OrderStatus = "جديد" | "قيد التحضير" | "جاري التوصيل" | "تم التسليم";
@@ -45,6 +60,15 @@ const initialRestaurants: Restaurant[] = [
   { id: "r6", name: "مشاوي أبو علي", category: "مشاوي", rating: 4.8, deliveryTime: "35-45 د", image: "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=800&q=80", tagline: "مشاوي على الفحم" },
 ];
 
+const initialCategories: Category[] = [
+  { id: "c1", name: "وجبات سريعة", icon: "UtensilsCrossed" },
+  { id: "c2", name: "إيطالي", icon: "Pizza" },
+  { id: "c3", name: "حلويات", icon: "IceCream" },
+  { id: "c4", name: "بقالة", icon: "ShoppingBasket" },
+  { id: "c5", name: "مشاوي", icon: "Flame" },
+  { id: "c6", name: "شامي", icon: "Coffee" },
+];
+
 const initialProducts: Product[] = [
   { id: "p1", restaurantId: "r1", name: "شاورما دجاج", description: "خبز صاج مع دجاج متبل وصلصة الثوم", price: 25000, image: "https://images.unsplash.com/photo-1633321702518-7feccafb94d5?w=600&q=80" },
   { id: "p2", restaurantId: "r1", name: "فتة حمص", description: "فتة حمص بالطحينة واللبن والصنوبر", price: 22000, image: "https://images.unsplash.com/photo-1604152135912-04a022e23696?w=600&q=80" },
@@ -60,33 +84,28 @@ const initialProducts: Product[] = [
   { id: "p12", restaurantId: "r6", name: "مشكل مشاوي", description: "كباب، شيش طاووق، ريش، خضار مشوية", price: 95000, image: "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=600&q=80" },
 ];
 
-const initialOrders: Order[] = [
-  {
-    id: "o1001",
-    customer: "أحمد العلي",
-    phone: "0994815815",
-    address: "دمشق - المزة - شارع الجلاء",
-    items: [{ product: initialProducts[0], qty: 2 }, { product: initialProducts[1], qty: 1 }],
-    total: 72000,
-    status: "قيد التحضير",
-    createdAt: "منذ 5 دقائق",
-  },
-  {
-    id: "o1002",
-    customer: "ليلى حسن",
-    phone: "0952203148",
-    address: "حلب - الفرقان - شارع نيسان",
-    items: [{ product: initialProducts[5], qty: 1 }],
-    total: 45000,
-    status: "جاري التوصيل",
-    createdAt: "منذ 20 دقيقة",
-  },
-];
+const initialOrders: Order[] = [];
+
+const initialSettings: Settings = {
+  adminPassword: "admin123",
+  driverPassword: "driver123",
+  announcements: [
+    "خصم 25% على أول طلب لك من برو ديليفري",
+    "توصيل مجاني للطلبات فوق 100,000 ل.س",
+    "اطلب وجبتين واحصل على عصير مجاناً",
+    "تطبيق برو الآن في كل المحافظات السورية",
+  ],
+};
 
 type AppState = {
   restaurants: Restaurant[];
   products: Product[];
   orders: Order[];
+  categories: Category[];
+  settings: Settings;
+  chat: ChatMessage[];
+  customerWallet: number;
+  driverEarnings: number;
   cart: CartItem[];
   role: Role | null;
   cartOpen: boolean;
@@ -98,8 +117,13 @@ type AppState = {
   placeOrder: (info: { customer: string; phone: string; address: string }) => void;
   upsertProduct: (p: Product) => void;
   deleteProduct: (id: string) => void;
+  upsertCategory: (c: Category) => void;
+  deleteCategory: (id: string) => void;
+  updateSettings: (s: Partial<Settings>) => void;
+  sendChat: (from: "customer" | "support", text: string) => void;
   updateOrderStatus: (id: string, status: OrderStatus) => void;
   login: (role: Role) => void;
+  setRole: (r: Role | null) => void;
   logout: () => void;
 };
 
@@ -109,12 +133,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [restaurants] = useState(initialRestaurants);
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialOrders);
+  const [categories, setCategories] = useState(initialCategories);
+  const [settings, setSettings] = useState(initialSettings);
+  const [chat, setChat] = useState<ChatMessage[]>([
+    { id: "m1", from: "support", text: "أهلاً بك في دعم BROO! كيف يمكننا مساعدتك؟", at: "الآن" },
+  ]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [role, setRole] = useState<Role | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
 
+  const customerWallet = 0; // يبدأ من صفر — يتحدث مع كل عملية شحن لاحقاً
+  const driverEarnings = orders
+    .filter((o) => o.status === "تم التسليم")
+    .reduce((s, o) => s + Math.round(o.total * 0.1), 0);
+
   const value = useMemo<AppState>(() => ({
-    restaurants, products, orders, cart, role, cartOpen, setCartOpen,
+    restaurants, products, orders, categories, settings, chat,
+    customerWallet, driverEarnings,
+    cart, role, cartOpen, setCartOpen,
     addToCart: (p) => setCart((c) => {
       const found = c.find((i) => i.product.id === p.id);
       if (found) return c.map((i) => i.product.id === p.id ? { ...i, qty: i.qty + 1 } : i);
@@ -142,10 +178,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return [...arr, p];
     }),
     deleteProduct: (id) => setProducts((arr) => arr.filter((p) => p.id !== id)),
+    upsertCategory: (c) => setCategories((arr) => {
+      const exists = arr.find((x) => x.id === c.id);
+      if (exists) return arr.map((x) => x.id === c.id ? c : x);
+      return [...arr, c];
+    }),
+    deleteCategory: (id) => setCategories((arr) => arr.filter((c) => c.id !== id)),
+    updateSettings: (s) => setSettings((cur) => ({ ...cur, ...s })),
+    sendChat: (from, text) => setChat((c) => [...c, { id: "m" + Date.now(), from, text, at: "الآن" }]),
     updateOrderStatus: (id, status) => setOrders((arr) => arr.map((o) => o.id === id ? { ...o, status } : o)),
     login: (r) => setRole(r),
+    setRole: (r) => setRole(r),
     logout: () => setRole(null),
-  }), [restaurants, products, orders, cart, role, cartOpen]);
+  }), [restaurants, products, orders, categories, settings, chat, customerWallet, driverEarnings, cart, role, cartOpen]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

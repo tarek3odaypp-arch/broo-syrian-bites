@@ -9,6 +9,8 @@ import { Footer } from "./Footer";
 import { LoginDialog } from "./LoginDialog";
 import { DriverDashboard } from "./DriverDashboard";
 import { AdminDashboard } from "./AdminDashboard";
+import { ChatWidget } from "./ChatWidget";
+import { RoleSwitcher } from "./RoleSwitcher";
 import { Toaster } from "@/components/ui/sonner";
 
 export function AppShell() {
@@ -16,8 +18,8 @@ export function AppShell() {
   const [activeRestaurant, setActiveRestaurant] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
 
-  if (role === "driver") return <DriverDashboard />;
-  if (role === "admin") return <AdminDashboard />;
+  if (role === "driver") return (<><DriverDashboard /><RoleSwitcher /><Toaster position="top-center" richColors /></>);
+  if (role === "admin") return (<><AdminDashboard /><RoleSwitcher /><Toaster position="top-center" richColors /></>);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -33,6 +35,8 @@ export function AppShell() {
       <Footer />
       <CartSidebar />
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
+      <ChatWidget />
+      <RoleSwitcher />
       <Toaster position="top-center" richColors />
     </div>
   );

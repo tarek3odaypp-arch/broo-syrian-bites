@@ -1,5 +1,5 @@
-import { ShieldCheck, LogOut, Plus, Pencil, Trash2, Package, Users, DollarSign, X } from "lucide-react";
-import { useApp, formatSYP, type Product, type OrderStatus } from "@/context/AppContext";
+import { ShieldCheck, LogOut, Plus, Pencil, Trash2, Package, Users, DollarSign, X, Settings as SettingsIcon, Megaphone, Tag, KeyRound, Wallet } from "lucide-react";
+import { useApp, formatSYP, type Product, type OrderStatus, type Category } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,17 +12,35 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const statuses: OrderStatus[] = ["جديد", "قيد التحضير", "جاري التوصيل", "تم التسليم"];
+const iconChoices = ["UtensilsCrossed", "Pizza", "IceCream", "ShoppingBasket", "Flame", "Coffee", "Tag"];
 
 export function AdminDashboard() {
-  const { products, restaurants, orders, upsertProduct, deleteProduct, updateOrderStatus, logout } = useApp();
+  const {
+    products, restaurants, orders, categories, settings, driverEarnings,
+    upsertProduct, deleteProduct, updateOrderStatus, logout,
+    upsertCategory, deleteCategory, updateSettings,
+  } = useApp();
+
   const [editing, setEditing] = useState<Product | null>(null);
   const [open, setOpen] = useState(false);
 
+  const [editCat, setEditCat] = useState<Category | null>(null);
+  const [catOpen, setCatOpen] = useState(false);
+
+  const [newAdminPass, setNewAdminPass] = useState("");
+  const [newDriverPass, setNewDriverPass] = useState("");
+  const [announceText, setAnnounceText] = useState(settings.announcements.join("\n"));
+
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
 
-  const startNew = () => {
+  const startNewProduct = () => {
     setEditing({ id: "p" + Date.now(), restaurantId: restaurants[0].id, name: "", description: "", price: 0, image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80" });
     setOpen(true);
+  };
+
+  const startNewCategory = () => {
+    setEditCat({ id: "c" + Date.now(), name: "", icon: "Tag" });
+    setCatOpen(true);
   };
 
   return (
@@ -39,20 +57,26 @@ export function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Stat icon={Package} label="عدد الطلبات" value={orders.length.toString()} />
           <Stat icon={Users} label="المطاعم" value={restaurants.length.toString()} />
-          <Stat icon={Package} label="المنتجات" value={products.length.toString()} />
+          <Stat icon={Tag} label="الأقسام" value={categories.length.toString()} />
           <Stat icon={DollarSign} label="الإيرادات" value={formatSYP(totalRevenue)} />
+          <Stat icon={Wallet} label="أرباح الكباتن" value={formatSYP(driverEarnings)} />
         </div>
 
         <Tabs defaultValue="orders">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="orders">الطلبات</TabsTrigger>
             <TabsTrigger value="products">المنتجات</TabsTrigger>
+            <TabsTrigger value="categories">الأقسام</TabsTrigger>
+            <TabsTrigger value="settings">إعدادات النظام</TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders" className="mt-4 space-y-3">
+            {orders.length === 0 && (
+              <div className="text-center py-12 bg-card rounded-2xl border text-muted-foreground">لا توجد طلبات حالياً - الإحصائيات تبدأ من صفر وتتحدث تلقائياً مع كل طلب جديد</div>
+            )}
             {orders.map((o) => (
               <div key={o.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
                 <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
@@ -82,7 +106,7 @@ export function AdminDashboard() {
           <TabsContent value="products" className="mt-4">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-black text-lg">إدارة المنتجات والأسعار</h3>
-              <Button onClick={startNew} className="bg-gradient-hero text-white gap-2"><Plus className="w-4 h-4" />منتج جديد</Button>
+              <Button onClick={startNewProduct} className="bg-gradient-hero text-white gap-2"><Plus className="w-4 h-4" />منتج جديد</Button>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {products.map((p) => {
@@ -104,9 +128,80 @@ export function AdminDashboard() {
               })}
             </div>
           </TabsContent>
+
+          <TabsContent value="categories" className="mt-4">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-black text-lg flex items-center gap-2"><Tag className="w-5 h-5 text-primary" />إدارة الأقسام الرئيسية</h3>
+              <Button onClick={startNewCategory} className="bg-gradient-hero text-white gap-2"><Plus className="w-4 h-4" />قسم جديد</Button>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {categories.map((c) => (
+                <div key={c.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-hero text-white grid place-items-center font-black">{c.name.charAt(0)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold truncate">{c.name}</div>
+                    <div className="text-[11px] text-muted-foreground">أيقونة: {c.icon}</div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => { setEditCat(c); setCatOpen(true); }} className="h-8 px-2 gap-1"><Pencil className="w-3 h-3" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => { deleteCategory(c.id); toast.success("تم حذف القسم"); }} className="h-8 px-2 text-destructive"><Trash2 className="w-3 h-3" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-4 space-y-4">
+            <h3 className="font-black text-lg flex items-center gap-2"><SettingsIcon className="w-5 h-5 text-primary" />إعدادات النظام</h3>
+
+            <div className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+              <h4 className="font-black mb-3 flex items-center gap-2"><KeyRound className="w-4 h-4 text-primary" />كلمات المرور</h4>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>كلمة مرور الأدمن الحالية: <code className="bg-muted px-1 rounded text-xs">{settings.adminPassword}</code></Label>
+                  <div className="flex gap-2">
+                    <Input value={newAdminPass} onChange={(e) => setNewAdminPass(e.target.value)} placeholder="كلمة مرور جديدة للأدمن" />
+                    <Button onClick={() => {
+                      if (!newAdminPass) return toast.error("أدخل كلمة مرور");
+                      updateSettings({ adminPassword: newAdminPass });
+                      setNewAdminPass("");
+                      toast.success("تم تحديث كلمة مرور الأدمن");
+                    }}>حفظ</Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>كلمة مرور الكابتن الحالية: <code className="bg-muted px-1 rounded text-xs">{settings.driverPassword}</code></Label>
+                  <div className="flex gap-2">
+                    <Input value={newDriverPass} onChange={(e) => setNewDriverPass(e.target.value)} placeholder="كلمة مرور جديدة للكابتن" />
+                    <Button onClick={() => {
+                      if (!newDriverPass) return toast.error("أدخل كلمة مرور");
+                      updateSettings({ driverPassword: newDriverPass });
+                      setNewDriverPass("");
+                      toast.success("تم تحديث كلمة مرور الكابتن");
+                    }}>حفظ</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+              <h4 className="font-black mb-3 flex items-center gap-2"><Megaphone className="w-4 h-4 text-primary" />نص الإعلان المتحرك</h4>
+              <p className="text-xs text-muted-foreground mb-2">كل سطر يمثل إعلاناً منفصلاً يظهر في الشريط العلوي للتطبيق</p>
+              <Textarea value={announceText} onChange={(e) => setAnnounceText(e.target.value)} rows={6} className="font-mono text-sm" />
+              <Button
+                className="mt-3 bg-gradient-hero text-white"
+                onClick={() => {
+                  const lines = announceText.split("\n").map((l) => l.trim()).filter(Boolean);
+                  updateSettings({ announcements: lines });
+                  toast.success("تم تحديث الإعلانات - شاهدها فوراً في الشريط العلوي");
+                }}
+              >حفظ الإعلانات</Button>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
+      {/* Product dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent dir="rtl">
           <DialogHeader><DialogTitle className="text-right">{editing && products.find((x) => x.id === editing.id) ? "تعديل منتج" : "منتج جديد"}</DialogTitle></DialogHeader>
@@ -127,6 +222,31 @@ export function AdminDashboard() {
               <div className="flex gap-2 pt-2">
                 <Button className="flex-1 bg-gradient-hero text-white" onClick={() => { upsertProduct(editing); setOpen(false); toast.success("تم الحفظ - التحديث ظاهر فوراً في قائمة الزبون"); }}>حفظ</Button>
                 <Button variant="outline" onClick={() => setOpen(false)}><X className="w-4 h-4" /></Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Category dialog */}
+      <Dialog open={catOpen} onOpenChange={setCatOpen}>
+        <DialogContent dir="rtl">
+          <DialogHeader><DialogTitle className="text-right">{editCat && categories.find((x) => x.id === editCat.id) ? "تعديل قسم" : "قسم جديد"}</DialogTitle></DialogHeader>
+          {editCat && (
+            <div className="space-y-3">
+              <div className="space-y-2"><Label>اسم القسم</Label><Input value={editCat.name} onChange={(e) => setEditCat({ ...editCat, name: e.target.value })} placeholder="مثال: مشاوي، بقالة، حلويات" /></div>
+              <div className="space-y-2"><Label>الأيقونة</Label>
+                <Select value={editCat.icon} onValueChange={(v) => setEditCat({ ...editCat, icon: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{iconChoices.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button className="flex-1 bg-gradient-hero text-white" onClick={() => {
+                  if (!editCat.name.trim()) return toast.error("أدخل اسم القسم");
+                  upsertCategory(editCat); setCatOpen(false); toast.success("تم حفظ القسم - يظهر فوراً في الواجهة");
+                }}>حفظ</Button>
+                <Button variant="outline" onClick={() => setCatOpen(false)}><X className="w-4 h-4" /></Button>
               </div>
             </div>
           )}
