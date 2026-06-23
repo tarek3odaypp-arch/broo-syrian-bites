@@ -1,29 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { AppProvider } from "@/context/AppContext";
+import { AppShell } from "@/components/broo/AppShell";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "BROO delivery - توصيل الطعام والبضائع" },
+      { name: "description", content: "برو ديليفري - خدمة توصيل الطعام والبضائع في كل سوريا. اطلب وجبتك المفضلة الآن!" },
+      { property: "og:title", content: "BROO delivery" },
+      { property: "og:description", content: "خدمة توصيل الطعام والبضائع في كل سوريا" },
     ],
   }),
-  component: Index,
+  component: () => (
+    <AppProvider>
+      <AppShell />
+    </AppProvider>
+  ),
 });
-
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
