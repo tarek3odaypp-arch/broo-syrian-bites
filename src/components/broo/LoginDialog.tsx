@@ -8,12 +8,8 @@ import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 
-// Mock credentials — note shown to user that admin controls these
-const DRIVER_PASS = "driver123";
-const ADMIN_PASS = "admin123";
-
 export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { login } = useApp();
+  const { login, settings } = useApp();
   const [driverPass, setDriverPass] = useState("");
   const [adminPass, setAdminPass] = useState("");
 
@@ -61,7 +57,7 @@ export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             </div>
             <Button
               onClick={() => {
-                if (driverPass === DRIVER_PASS) {
+                if (driverPass === settings.driverPassword) {
                   login("driver");
                   onOpenChange(false);
                   toast.success("مرحباً أيها السائق");
@@ -71,7 +67,7 @@ export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             >
               دخول لوحة السائق
             </Button>
-            <p className="text-[11px] text-muted-foreground text-center">للتجربة: <code className="bg-muted px-1 rounded">driver123</code></p>
+            <p className="text-[11px] text-muted-foreground text-center">يتحكم الأدمن بكلمة المرور من لوحة الإعدادات</p>
           </TabsContent>
 
           <TabsContent value="admin" className="space-y-3 mt-4">
@@ -86,7 +82,7 @@ export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             </div>
             <Button
               onClick={() => {
-                if (adminPass === ADMIN_PASS) {
+                if (adminPass === settings.adminPassword) {
                   login("admin");
                   onOpenChange(false);
                   toast.success("مرحباً بك في لوحة الإدارة");
@@ -96,7 +92,7 @@ export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             >
               دخول لوحة الإدارة
             </Button>
-            <p className="text-[11px] text-muted-foreground text-center">للتجربة: <code className="bg-muted px-1 rounded">admin123</code></p>
+            <p className="text-[11px] text-muted-foreground text-center">يمكن تغيير كلمة المرور من إعدادات النظام</p>
           </TabsContent>
         </Tabs>
       </DialogContent>
