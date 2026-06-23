@@ -1,19 +1,14 @@
-import { Search, Star, Clock, UtensilsCrossed, Pizza, IceCream, ShoppingBasket, Flame, Coffee } from "lucide-react";
+import { Search, Star, Clock, UtensilsCrossed, Pizza, IceCream, ShoppingBasket, Flame, Coffee, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useApp } from "@/context/AppContext";
 import { useState } from "react";
 
-const categories = [
-  { name: "وجبات سريعة", icon: UtensilsCrossed },
-  { name: "إيطالي", icon: Pizza },
-  { name: "حلويات", icon: IceCream },
-  { name: "بقالة", icon: ShoppingBasket },
-  { name: "مشاوي", icon: Flame },
-  { name: "شامي", icon: Coffee },
-];
+const iconMap: Record<string, any> = {
+  UtensilsCrossed, Pizza, IceCream, ShoppingBasket, Flame, Coffee, Tag,
+};
 
 export function Home({ onOpenRestaurant }: { onOpenRestaurant: (id: string) => void }) {
-  const { restaurants } = useApp();
+  const { restaurants, categories } = useApp();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string | null>(null);
   const filtered = restaurants.filter(
@@ -65,9 +60,10 @@ export function Home({ onOpenRestaurant }: { onOpenRestaurant: (id: string) => v
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {categories.map((c) => {
             const active = cat === c.name;
+            const Icon = iconMap[c.icon] || Tag;
             return (
               <button
-                key={c.name}
+                key={c.id}
                 onClick={() => setCat(active ? null : c.name)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
                   active
@@ -75,7 +71,7 @@ export function Home({ onOpenRestaurant }: { onOpenRestaurant: (id: string) => v
                     : "bg-card border-border hover:border-primary/40 hover:-translate-y-0.5 shadow-soft"
                 }`}
               >
-                <c.icon className="w-7 h-7" />
+                <Icon className="w-7 h-7" />
                 <span className="text-xs font-bold">{c.name}</span>
               </button>
             );
