@@ -1,0 +1,5 @@
+{
+  "name": "broo-syrian-bites",
+  "compatibility_date": "2026-06-24",
+  "main": ".output/server/index.mjs"
+}
