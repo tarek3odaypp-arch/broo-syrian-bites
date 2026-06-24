@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export type Role = "customer" | "driver" | "admin";
 
@@ -86,6 +87,31 @@ const initialProducts: Product[] = [
 
 const initialOrders: Order[] = [];
 
+// ---------- Supabase row <-> app type mappers ----------
+type RestaurantRow = { id: string; name: string; category: string; rating: number; delivery_time: string; image: string; tagline: string };
+type ProductRow = { id: string; restaurant_id: string; name: string; description: string; price: number; image: string };
+type OrderRow = { id: string; customer: string; phone: string; address: string; items: CartItem[]; total: number; status: OrderStatus; created_at: string };
+type ChatRow = { id: string; from_role: "customer" | "support"; text: string; created_at: string };
+type SettingRow = { key: string; value: unknown };
+
+const toRestaurant = (r: RestaurantRow): Restaurant => ({
+  id: r.id, name: r.name, category: r.category, rating: Number(r.rating),
+  deliveryTime: r.delivery_time, image: r.image, tagline: r.tagline,
+});
+const toProduct = (p: ProductRow): Product => ({
+  id: p.id, restaurantId: p.restaurant_id, name: p.name,
+  description: p.description, price: Number(p.price), image: p.image,
+});
+const toOrder = (o: OrderRow): Order => ({
+  id: o.id, customer: o.customer, phone: o.phone, address: o.address,
+  items: o.items, total: Number(o.total), status: o.status,
+  createdAt: new Date(o.created_at).toLocaleString("ar-SY"),
+});
+const toChat = (m: ChatRow): ChatMessage => ({
+  id: m.id, from: m.from_role, text: m.text,
+  at: new Date(m.created_at).toLocaleTimeString("ar-SY", { hour: "2-digit", minute: "2-digit" }),
+});
+
 const initialSettings: Settings = {
   adminPassword: "admin123",
   driverPassword: "driver123",
@@ -130,7 +156,7 @@ type AppState = {
 const Ctx = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [restaurants] = useState(initialRestaurants);
+  const [restaurants, setRestaurants] = useState(initialRestaurants);
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialOrders);
   const [categories, setCategories] = useState(initialCategories);
@@ -141,6 +167,84 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [role, setRole] = useState<Role | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+
+  // ---------- Initial fetch + realtime sync ----------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [r, c, p, o, s, m] = await Promise.all([
+        supabase.from("restaurants").select("*"),
+        supabase.from("categories").select("*"),
+        supabase.from("products").select("*"),
+        supabase.from("orders").select("*").order("created_at", { ascending: false }),
+        supabase.from("settings").select("*"),
+        supabase.from("chat_messages").select("*").order("created_at", { ascending: true }),
+      ]);
+      if (cancelled) return;
+      if (r.data && r.data.length) setRestaurants(r.data.map(toRestaurant));
+      if (c.data && c.data.length) setCategories(c.data as Category[]);
+      if (p.data && p.data.length) setProducts(p.data.map(toProduct));
+      if (o.data) setOrders(o.data.map(toOrder));
+      if (s.data && s.data.length) {
+        const map = Object.fromEntries((s.data as SettingRow[]).map((row) => [row.key, row.value]));
+        setSettings({
+          adminPassword: (map.admin_password as string) ?? initialSettings.adminPassword,
+          driverPassword: (map.driver_password as string) ?? initialSettings.driverPassword,
+          announcements: (map.announcements as string[]) ?? initialSettings.announcements,
+        });
+      }
+      if (m.data && m.data.length) setChat(m.data.map(toChat));
+    })();
+
+    const refetch = {
+      restaurants: async () => {
+        const { data } = await supabase.from("restaurants").select("*");
+        if (data) setRestaurants(data.map(toRestaurant));
+      },
+      categories: async () => {
+        const { data } = await supabase.from("categories").select("*");
+        if (data) setCategories(data as Category[]);
+      },
+      products: async () => {
+        const { data } = await supabase.from("products").select("*");
+        if (data) setProducts(data.map(toProduct));
+      },
+      orders: async () => {
+        const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+        if (data) setOrders(data.map(toOrder));
+      },
+      settings: async () => {
+        const { data } = await supabase.from("settings").select("*");
+        if (data) {
+          const map = Object.fromEntries((data as SettingRow[]).map((row) => [row.key, row.value]));
+          setSettings((cur) => ({
+            adminPassword: (map.admin_password as string) ?? cur.adminPassword,
+            driverPassword: (map.driver_password as string) ?? cur.driverPassword,
+            announcements: (map.announcements as string[]) ?? cur.announcements,
+          }));
+        }
+      },
+      chat: async () => {
+        const { data } = await supabase.from("chat_messages").select("*").order("created_at", { ascending: true });
+        if (data) setChat(data.map(toChat));
+      },
+    };
+
+    const channel = supabase
+      .channel("broo-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "restaurants" }, refetch.restaurants)
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, refetch.categories)
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, refetch.products)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, refetch.orders)
+      .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, refetch.settings)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, refetch.chat)
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const customerWallet = 0; // يبدأ من صفر — يتحدث مع كل عملية شحن لاحقاً
   const driverEarnings = orders
@@ -171,22 +275,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       setOrders((o) => [order, ...o]);
       setCart([]);
+      void supabase.from("orders").insert({
+        id: order.id, customer: order.customer, phone: order.phone, address: order.address,
+        items: order.items, total: order.total, status: order.status,
+      });
     },
-    upsertProduct: (p) => setProducts((arr) => {
-      const exists = arr.find((x) => x.id === p.id);
-      if (exists) return arr.map((x) => x.id === p.id ? p : x);
-      return [...arr, p];
-    }),
-    deleteProduct: (id) => setProducts((arr) => arr.filter((p) => p.id !== id)),
-    upsertCategory: (c) => setCategories((arr) => {
-      const exists = arr.find((x) => x.id === c.id);
-      if (exists) return arr.map((x) => x.id === c.id ? c : x);
-      return [...arr, c];
-    }),
-    deleteCategory: (id) => setCategories((arr) => arr.filter((c) => c.id !== id)),
-    updateSettings: (s) => setSettings((cur) => ({ ...cur, ...s })),
-    sendChat: (from, text) => setChat((c) => [...c, { id: "m" + Date.now(), from, text, at: "الآن" }]),
-    updateOrderStatus: (id, status) => setOrders((arr) => arr.map((o) => o.id === id ? { ...o, status } : o)),
+    upsertProduct: (p) => {
+      setProducts((arr) => {
+        const exists = arr.find((x) => x.id === p.id);
+        return exists ? arr.map((x) => x.id === p.id ? p : x) : [...arr, p];
+      });
+      void supabase.from("products").upsert({
+        id: p.id, restaurant_id: p.restaurantId, name: p.name,
+        description: p.description, price: p.price, image: p.image,
+      });
+    },
+    deleteProduct: (id) => {
+      setProducts((arr) => arr.filter((p) => p.id !== id));
+      void supabase.from("products").delete().eq("id", id);
+    },
+    upsertCategory: (c) => {
+      setCategories((arr) => {
+        const exists = arr.find((x) => x.id === c.id);
+        return exists ? arr.map((x) => x.id === c.id ? c : x) : [...arr, c];
+      });
+      void supabase.from("categories").upsert({ id: c.id, name: c.name, icon: c.icon });
+    },
+    deleteCategory: (id) => {
+      setCategories((arr) => arr.filter((c) => c.id !== id));
+      void supabase.from("categories").delete().eq("id", id);
+    },
+    updateSettings: (s) => {
+      setSettings((cur) => ({ ...cur, ...s }));
+      const rows: { key: string; value: unknown }[] = [];
+      if (s.adminPassword !== undefined) rows.push({ key: "admin_password", value: s.adminPassword });
+      if (s.driverPassword !== undefined) rows.push({ key: "driver_password", value: s.driverPassword });
+      if (s.announcements !== undefined) rows.push({ key: "announcements", value: s.announcements });
+      if (rows.length) void supabase.from("settings").upsert(rows);
+    },
+    sendChat: (from, text) => {
+      const msg: ChatMessage = { id: "m" + Date.now(), from, text, at: "الآن" };
+      setChat((c) => [...c, msg]);
+      void supabase.from("chat_messages").insert({ from_role: from, text });
+    },
+    updateOrderStatus: (id, status) => {
+      setOrders((arr) => arr.map((o) => o.id === id ? { ...o, status } : o));
+      void supabase.from("orders").update({ status }).eq("id", id);
+    },
     login: (r) => setRole(r),
     setRole: (r) => setRole(r),
     logout: () => setRole(null),
