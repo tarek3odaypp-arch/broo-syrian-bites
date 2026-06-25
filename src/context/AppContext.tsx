@@ -207,6 +207,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else window.localStorage.removeItem("broo_current_user");
   }, [currentUser]);
 
+  // Auto-login: restore customer role from persisted session on mount
+  useEffect(() => {
+    if (currentUser && currentUser.status === "approved" && role === null) {
+      setRole("customer");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ---------- Initial fetch + realtime sync ----------
   useEffect(() => {
     let cancelled = false;
