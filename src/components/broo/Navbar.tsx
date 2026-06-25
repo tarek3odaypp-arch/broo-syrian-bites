@@ -49,7 +49,7 @@ export function Navbar({ onLogin, onHome }: { onLogin: () => void; onHome: () =>
         ) : (
           <Button
             onClick={onLogin}
-            className="gap-2 h-11 px-6 rounded-xl bg-gradient-hero text-white font-black text-base shadow-elegant hover:shadow-2xl hover:scale-105 transition-all duration-300 ring-2 ring-primary/20 hover:ring-primary/40 animate-pulse-soft"
+            className="gap-2 h-11 px-6 rounded-xl bg-gradient-hero text-white font-black text-base shadow-elegant hover:shadow-2xl hover:scale-105 transition-all duration-300 ring-2 ring-primary/30 hover:ring-primary/50"
           >
             <LogIn className="w-5 h-5" />
             <span>دخول</span>
