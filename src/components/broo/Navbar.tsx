@@ -55,7 +55,7 @@ export function Navbar({ onLogin, onHome }: { onLogin: () => void; onHome: () =>
             <span>دخول</span>
           </Button>
         )}
-        <Button onClick={() => setCartOpen(true)} className="gap-2 bg-gradient-hero hover:opacity-90 text-white shadow-elegant relative">
+        <Button onClick={() => setCartOpen(true)} variant="outline" className="gap-2 h-11 rounded-xl border-2 relative">
           <ShoppingCart className="w-4 h-4" />
           <span className="hidden sm:inline">السلة</span>
           {count > 0 && (
