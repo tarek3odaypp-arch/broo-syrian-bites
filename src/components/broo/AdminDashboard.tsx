@@ -1,4 +1,4 @@
-import { ShieldCheck, LogOut, Plus, Pencil, Trash2, Package, Users, DollarSign, X, Settings as SettingsIcon, Megaphone, Tag, KeyRound, Wallet } from "lucide-react";
+import { ShieldCheck, LogOut, Plus, Pencil, Trash2, Package, Users, DollarSign, X, Settings as SettingsIcon, Megaphone, Tag, KeyRound, Wallet, UserCheck, UserX, UserPlus } from "lucide-react";
 import { useApp, formatSYP, type Product, type OrderStatus, type Category } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ export function AdminDashboard() {
     products, restaurants, orders, categories, settings, driverEarnings,
     upsertProduct, deleteProduct, updateOrderStatus, logout,
     upsertCategory, deleteCategory, updateSettings,
+    profiles, setProfileStatus, deleteProfile,
   } = useApp();
 
   const [editing, setEditing] = useState<Product | null>(null);
@@ -32,6 +33,7 @@ export function AdminDashboard() {
   const [announceText, setAnnounceText] = useState(settings.announcements.join("\n"));
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
+  const pendingProfiles = profiles.filter((p) => p.status === "pending");
 
   const startNewProduct = () => {
     setEditing({ id: "p" + Date.now(), restaurantId: restaurants[0].id, name: "", description: "", price: 0, image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80" });
@@ -68,6 +70,13 @@ export function AdminDashboard() {
         <Tabs defaultValue="orders">
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="orders">الطلبات</TabsTrigger>
+            <TabsTrigger value="registrations" className="gap-1.5">
+              <UserPlus className="w-3.5 h-3.5" />
+              طلبات التسجيل
+              {pendingProfiles.length > 0 && (
+                <span className="bg-primary text-white text-[10px] font-black rounded-full px-1.5 min-w-[18px] grid place-items-center">{pendingProfiles.length}</span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="products">المنتجات</TabsTrigger>
             <TabsTrigger value="categories">الأقسام</TabsTrigger>
             <TabsTrigger value="settings">إعدادات النظام</TabsTrigger>
@@ -98,6 +107,43 @@ export function AdminDashboard() {
                       {statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+            ))}
+          </TabsContent>
+
+          <TabsContent value="registrations" className="mt-4 space-y-3">
+            <h3 className="font-black text-lg flex items-center gap-2"><UserPlus className="w-5 h-5 text-primary" />طلبات تسجيل الزبائن</h3>
+            {profiles.length === 0 && (
+              <div className="text-center py-12 bg-card rounded-2xl border text-muted-foreground">لا توجد طلبات تسجيل بعد — ستظهر الطلبات الجديدة هنا فوراً مع تنبيه لحظي</div>
+            )}
+            {profiles.map((p) => (
+              <div key={p.id} className="bg-card border border-border rounded-2xl p-4 shadow-soft">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="font-black">{p.name}</div>
+                    <div className="text-xs text-muted-foreground" dir="ltr">{p.phone}</div>
+                    {p.address && <div className="text-xs text-muted-foreground mt-0.5">📍 {p.address}</div>}
+                    <div className="text-[11px] text-muted-foreground mt-1">سُجّل: {p.createdAt}</div>
+                  </div>
+                  <Badge variant={p.status === "approved" ? "default" : p.status === "rejected" ? "destructive" : "secondary"}>
+                    {p.status === "pending" ? "قيد المراجعة" : p.status === "approved" ? "موافَق عليه" : "مرفوض"}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-3 border-t pt-3">
+                  {p.status !== "approved" && (
+                    <Button size="sm" onClick={() => { setProfileStatus(p.id, "approved"); toast.success(`تم تفعيل حساب ${p.name}`); }} className="gap-1 bg-gradient-hero text-white">
+                      <UserCheck className="w-3.5 h-3.5" />موافقة
+                    </Button>
+                  )}
+                  {p.status !== "rejected" && (
+                    <Button size="sm" variant="outline" onClick={() => { setProfileStatus(p.id, "rejected"); toast.success("تم الرفض"); }} className="gap-1">
+                      <UserX className="w-3.5 h-3.5" />رفض
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => { deleteProfile(p.id); toast.success("تم الحذف"); }} className="gap-1 text-destructive">
+                    <Trash2 className="w-3.5 h-3.5" />حذف
+                  </Button>
                 </div>
               </div>
             ))}
