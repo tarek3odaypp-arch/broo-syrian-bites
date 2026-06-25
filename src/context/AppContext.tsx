@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export type Role = "customer" | "driver" | "admin";
 
@@ -35,6 +36,17 @@ export type Settings = {
   adminPassword: string;
   driverPassword: string;
   announcements: string[];
+};
+
+export type ProfileStatus = "pending" | "approved" | "rejected";
+export type Profile = {
+  id: string;
+  name: string;
+  phone: string;
+  password: string;
+  address: string;
+  status: ProfileStatus;
+  createdAt: string;
 };
 
 export type CartItem = { product: Product; qty: number };
@@ -130,6 +142,8 @@ type AppState = {
   categories: Category[];
   settings: Settings;
   chat: ChatMessage[];
+  profiles: Profile[];
+  currentUser: Profile | null;
   customerWallet: number;
   driverEarnings: number;
   cart: CartItem[];
@@ -151,6 +165,10 @@ type AppState = {
   login: (role: Role) => void;
   setRole: (r: Role | null) => void;
   logout: () => void;
+  registerCustomer: (data: { name: string; phone: string; password: string; address: string }) => Promise<{ ok: boolean; message: string }>;
+  loginCustomer: (phone: string, password: string) => Promise<{ ok: boolean; message: string }>;
+  setProfileStatus: (id: string, status: ProfileStatus) => void;
+  deleteProfile: (id: string) => void;
 };
 
 const Ctx = createContext<AppState | null>(null);
@@ -167,18 +185,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [role, setRole] = useState<Role | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [currentUser, setCurrentUser] = useState<Profile | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem("broo_current_user");
+      return raw ? (JSON.parse(raw) as Profile) : null;
+    } catch { return null; }
+  });
+
+  // Persist current user session across reloads
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (currentUser) window.localStorage.setItem("broo_current_user", JSON.stringify(currentUser));
+    else window.localStorage.removeItem("broo_current_user");
+  }, [currentUser]);
 
   // ---------- Initial fetch + realtime sync ----------
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [r, c, p, o, s, m] = await Promise.all([
+      const [r, c, p, o, s, m, pr] = await Promise.all([
         supabase.from("restaurants").select("*"),
         supabase.from("categories").select("*"),
         supabase.from("products").select("*"),
         supabase.from("orders").select("*").order("created_at", { ascending: false }),
         supabase.from("settings").select("*"),
         supabase.from("chat_messages").select("*").order("created_at", { ascending: true }),
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
       ]);
       if (cancelled) return;
       if (r.data && r.data.length) setRestaurants(r.data.map(toRestaurant));
@@ -194,6 +228,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       }
       if (m.data && m.data.length) setChat(m.data.map(toChat));
+      if (pr.data) setProfiles(pr.data.map(toProfile));
     })();
 
     const refetch = {
@@ -228,6 +263,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { data } = await supabase.from("chat_messages").select("*").order("created_at", { ascending: true });
         if (data) setChat(data.map(toChat));
       },
+      profiles: async () => {
+        const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+        if (data) setProfiles(data.map(toProfile));
+      },
     };
 
     const channel = supabase
@@ -238,6 +277,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, refetch.orders)
       .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, refetch.settings)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, refetch.chat)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "profiles" }, (payload) => {
+        refetch.profiles();
+        const row = payload.new as ProfileRow | undefined;
+        if (row) {
+          toast.info(`🔔 طلب تسجيل جديد: ${row.name} (${row.phone})`, { duration: 8000 });
+        }
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, (payload) => {
+        refetch.profiles();
+        const row = payload.new as ProfileRow | undefined;
+        // If the currently logged-in customer was approved/rejected, sync local session
+        setCurrentUser((cur) => (cur && row && cur.id === row.id ? toProfile(row) : cur));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "profiles" }, refetch.profiles)
       .subscribe();
 
     return () => {
@@ -253,6 +306,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppState>(() => ({
     restaurants, products, orders, categories, settings, chat,
+    profiles, currentUser,
     customerWallet, driverEarnings,
     cart, role, cartOpen, setCartOpen,
     addToCart: (p) => setCart((c) => {
@@ -324,8 +378,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     login: (r) => setRole(r),
     setRole: (r) => setRole(r),
-    logout: () => setRole(null),
-  }), [restaurants, products, orders, categories, settings, chat, customerWallet, driverEarnings, cart, role, cartOpen]);
+    logout: () => { setRole(null); setCurrentUser(null); },
+    registerCustomer: async ({ name, phone, password, address }) => {
+      const cleanPhone = phone.trim();
+      if (!/^09\d{8}$/.test(cleanPhone)) return { ok: false, message: "رقم الموبايل يجب أن يبدأ بـ 09 ويتكوّن من 10 أرقام" };
+      if (password.length < 4) return { ok: false, message: "كلمة المرور قصيرة جداً" };
+      if (!name.trim()) return { ok: false, message: "أدخل الاسم الكامل" };
+      const existing = profiles.find((p) => p.phone === cleanPhone);
+      if (existing) return { ok: false, message: "هذا الرقم مسجّل مسبقاً" };
+      const { data, error } = await supabase.from("profiles").insert({
+        name: name.trim(), phone: cleanPhone, password, address: address.trim(), status: "pending",
+      }).select().single();
+      if (error || !data) return { ok: false, message: "تعذّر إنشاء الحساب — تحقّق من تشغيل سكربت قاعدة البيانات" };
+      const created = toProfile(data as ProfileRow);
+      setProfiles((arr) => [created, ...arr.filter((x) => x.id !== created.id)]);
+      setCurrentUser(created);
+      return { ok: true, message: "تم إرسال طلبك! بانتظار موافقة الإدارة." };
+    },
+    loginCustomer: async (phone, password) => {
+      const cleanPhone = phone.trim();
+      const { data } = await supabase.from("profiles").select("*").eq("phone", cleanPhone).maybeSingle();
+      const found = data ? toProfile(data as ProfileRow) : profiles.find((p) => p.phone === cleanPhone);
+      if (!found) return { ok: false, message: "هذا الرقم غير مسجّل" };
+      if (found.password !== password) return { ok: false, message: "كلمة المرور غير صحيحة" };
+      setCurrentUser(found);
+      if (found.status === "pending") return { ok: true, message: "حسابك بانتظار موافقة الإدارة" };
+      if (found.status === "rejected") return { ok: false, message: "تم رفض حسابك — تواصل مع الدعم" };
+      setRole("customer");
+      return { ok: true, message: `أهلاً ${found.name}` };
+    },
+    setProfileStatus: (id, status) => {
+      setProfiles((arr) => arr.map((p) => p.id === id ? { ...p, status } : p));
+      void supabase.from("profiles").update({ status }).eq("id", id);
+    },
+    deleteProfile: (id) => {
+      setProfiles((arr) => arr.filter((p) => p.id !== id));
+      void supabase.from("profiles").delete().eq("id", id);
+    },
+  }), [restaurants, products, orders, categories, settings, chat, profiles, currentUser, customerWallet, driverEarnings, cart, role, cartOpen]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
