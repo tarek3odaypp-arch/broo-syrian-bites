@@ -105,6 +105,7 @@ type ProductRow = { id: string; restaurant_id: string; name: string; description
 type OrderRow = { id: string; customer: string; phone: string; address: string; items: CartItem[]; total: number; status: OrderStatus; created_at: string };
 type ChatRow = { id: string; from_role: "customer" | "support"; text: string; created_at: string };
 type SettingRow = { key: string; value: unknown };
+type ProfileRow = { id: string; name: string; phone: string; password: string; address: string | null; status: ProfileStatus; created_at: string };
 
 const toRestaurant = (r: RestaurantRow): Restaurant => ({
   id: r.id, name: r.name, category: r.category, rating: Number(r.rating),
@@ -122,6 +123,11 @@ const toOrder = (o: OrderRow): Order => ({
 const toChat = (m: ChatRow): ChatMessage => ({
   id: m.id, from: m.from_role, text: m.text,
   at: new Date(m.created_at).toLocaleTimeString("ar-SY", { hour: "2-digit", minute: "2-digit" }),
+});
+const toProfile = (p: ProfileRow): Profile => ({
+  id: p.id, name: p.name, phone: p.phone, password: p.password,
+  address: p.address ?? "", status: p.status,
+  createdAt: new Date(p.created_at).toLocaleString("ar-SY"),
 });
 
 const initialSettings: Settings = {
