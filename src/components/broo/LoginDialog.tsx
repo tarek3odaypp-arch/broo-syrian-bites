@@ -3,15 +3,22 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { User, Bike, ShieldCheck, Lock, Info } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { User, Bike, ShieldCheck, Lock, Info, Clock } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 
 export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { login, settings } = useApp();
+  const { login, settings, registerCustomer, loginCustomer } = useApp();
   const [driverPass, setDriverPass] = useState("");
   const [adminPass, setAdminPass] = useState("");
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [phone, setPhone] = useState("");
+  const [pass, setPass] = useState("");
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [busy, setBusy] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -31,18 +38,63 @@ export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChang
           </TabsList>
 
           <TabsContent value="customer" className="space-y-3 mt-4">
+            <div className="flex gap-2 bg-muted rounded-xl p-1">
+              <button onClick={() => setMode("login")} className={`flex-1 h-9 rounded-lg text-sm font-bold ${mode === "login" ? "bg-background shadow-soft" : "text-muted-foreground"}`}>دخول</button>
+              <button onClick={() => setMode("signup")} className={`flex-1 h-9 rounded-lg text-sm font-bold ${mode === "signup" ? "bg-background shadow-soft" : "text-muted-foreground"}`}>تسجيل جديد</button>
+            </div>
+
+            {mode === "signup" && (
+              <div className="space-y-2">
+                <Label>الاسم الكامل</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: أحمد محمد" />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>رقم الموبايل</Label>
-              <Input placeholder="09xxxxxxxx" />
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" inputMode="numeric" maxLength={10} />
             </div>
+
             <div className="space-y-2">
               <Label>كلمة المرور</Label>
-              <Input type="password" placeholder="••••••••" />
+              <Input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" />
             </div>
-            <Button onClick={() => { toast.success("أهلاً وسهلاً بك!"); onOpenChange(false); }} className="w-full bg-gradient-hero text-white h-11 rounded-xl font-bold">
-              دخول كزبون
+
+            {mode === "signup" && (
+              <>
+                <div className="space-y-2">
+                  <Label>عنوان التوصيل (اختياري)</Label>
+                  <Textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="المدينة، الحي، تفاصيل إضافية" />
+                </div>
+                <div className="flex gap-2 bg-accent text-accent-foreground rounded-xl p-3 text-xs leading-relaxed">
+                  <Clock className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>سيُنشأ حسابك بحالة <b>«قيد المراجعة»</b>. يتمّ تنبيه الإدارة فوراً، وتفعَّل خدماتك بعد الموافقة.</span>
+                </div>
+              </>
+            )}
+
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  if (mode === "signup") {
+                    const res = await registerCustomer({ name, phone, password: pass, address });
+                    if (!res.ok) return toast.error(res.message);
+                    toast.success(res.message);
+                    onOpenChange(false);
+                  } else {
+                    const res = await loginCustomer(phone, pass);
+                    if (!res.ok) return toast.error(res.message);
+                    toast.success(res.message);
+                    onOpenChange(false);
+                  }
+                } finally { setBusy(false); }
+              }}
+              className="w-full bg-gradient-hero text-white h-11 rounded-xl font-bold"
+            >
+              {busy ? "..." : mode === "signup" ? "إنشاء الحساب" : "دخول كزبون"}
             </Button>
-            <p className="text-xs text-center text-muted-foreground">ليس لديك حساب؟ <span className="text-primary font-bold cursor-pointer">سجل الآن</span></p>
           </TabsContent>
 
           <TabsContent value="driver" className="space-y-3 mt-4">
