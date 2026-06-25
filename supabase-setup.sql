@@ -64,6 +64,17 @@ create table if not exists public.chat_messages (
   created_at timestamptz not null default now()
 );
 
+-- Customer profiles + registration approval workflow (DB-state only, no external OTP).
+create table if not exists public.profiles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text not null unique,
+  password text not null,
+  address text default '',
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  created_at timestamptz not null default now()
+);
+
 -- ---------- GRANTS (required for Data API) ----------
 grant select, insert, update, delete on public.restaurants    to anon, authenticated;
 grant select, insert, update, delete on public.categories     to anon, authenticated;
@@ -71,8 +82,9 @@ grant select, insert, update, delete on public.products       to anon, authentic
 grant select, insert, update, delete on public.orders         to anon, authenticated;
 grant select, insert, update, delete on public.settings       to anon, authenticated;
 grant select, insert, update, delete on public.chat_messages  to anon, authenticated;
+grant select, insert, update, delete on public.profiles       to anon, authenticated;
 grant all on public.restaurants, public.categories, public.products,
-            public.orders, public.settings, public.chat_messages to service_role;
+            public.orders, public.settings, public.chat_messages, public.profiles to service_role;
 
 -- ---------- RLS ----------
 alter table public.restaurants   enable row level security;
@@ -81,13 +93,14 @@ alter table public.products      enable row level security;
 alter table public.orders        enable row level security;
 alter table public.settings      enable row level security;
 alter table public.chat_messages enable row level security;
+alter table public.profiles      enable row level security;
 
 -- Demo-grade policies: open access to anon (REPLACE before production).
 do $$
 declare
   t text;
 begin
-  foreach t in array array['restaurants','categories','products','orders','settings','chat_messages'] loop
+  foreach t in array array['restaurants','categories','products','orders','settings','chat_messages','profiles'] loop
     execute format('drop policy if exists "demo_all_%1$s" on public.%1$s', t);
     execute format(
       'create policy "demo_all_%1$s" on public.%1$s for all to anon, authenticated using (true) with check (true)',
@@ -103,6 +116,7 @@ alter publication supabase_realtime add table public.products;
 alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.settings;
 alter publication supabase_realtime add table public.chat_messages;
+alter publication supabase_realtime add table public.profiles;
 
 -- ---------- SEED DATA ----------
 insert into public.restaurants (id,name,category,rating,delivery_time,image,tagline) values
