@@ -1,10 +1,11 @@
-import { Bike, LogOut, MapPin, Phone, Package, CheckCircle2, Navigation, Wallet } from "lucide-react";
+import { Bike, LogOut, MapPin, Phone, Package, CheckCircle2, Navigation, Wallet, CheckCheck } from "lucide-react";
 import { useApp, formatSYP, type OrderStatus } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const next: Record<OrderStatus, OrderStatus | null> = {
   "جديد": "قيد التحضير",
+  "مقبول": "قيد التحضير",
   "قيد التحضير": "جاري التوصيل",
   "جاري التوصيل": "تم التسليم",
   "تم التسليم": null,
@@ -12,14 +13,19 @@ const next: Record<OrderStatus, OrderStatus | null> = {
 
 const tone: Record<OrderStatus, string> = {
   "جديد": "bg-blue-100 text-blue-700",
+  "مقبول": "bg-indigo-100 text-indigo-700",
   "قيد التحضير": "bg-amber-100 text-amber-700",
   "جاري التوصيل": "bg-orange-100 text-orange-700",
   "تم التسليم": "bg-green-100 text-green-700",
 };
 
+const DRIVER_ID = "DRV-1024";
+
 export function DriverDashboard() {
-  const { orders, updateOrderStatus, logout, driverEarnings } = useApp();
-  const active = orders.filter((o) => o.status !== "تم التسليم");
+  const { orders, updateOrderStatus, acceptOrder, logout, driverEarnings } = useApp();
+  const pending = orders.filter((o) => o.status === "جديد" && !o.driverId);
+  const mine = orders.filter((o) => o.driverId === DRIVER_ID && o.status !== "تم التسليم");
+  const active = [...pending, ...mine];
   const done = orders.filter((o) => o.status === "تم التسليم");
 
   return (
@@ -29,7 +35,7 @@ export function DriverDashboard() {
           <div className="w-10 h-10 rounded-2xl bg-white/15 grid place-items-center"><Bike className="w-5 h-5" /></div>
           <div className="flex-1">
             <div className="font-black text-lg">لوحة السائق</div>
-            <div className="text-xs opacity-90">BROO delivery - السائق #DRV-1024</div>
+          <div className="text-xs opacity-90">BROO delivery - السائق #{DRIVER_ID}</div>
           </div>
           <Button variant="secondary" onClick={logout} className="gap-2"><LogOut className="w-4 h-4" />خروج</Button>
         </div>
@@ -37,9 +43,9 @@ export function DriverDashboard() {
 
       <main className="container mx-auto px-4 py-6 space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat label="طلبات نشطة" value={active.length.toString()} />
+          <Stat label="طلبات بانتظار القبول" value={pending.length.toString()} />
+          <Stat label="طلباتي النشطة" value={mine.length.toString()} />
           <Stat label="طلبات اليوم" value={orders.length.toString()} />
-          <Stat label="تم التسليم" value={done.length.toString()} />
           <Stat label="محفظتي" value={formatSYP(driverEarnings)} icon={Wallet} />
         </div>
 
@@ -68,7 +74,11 @@ export function DriverDashboard() {
                 </ul>
                 <div className="flex items-center justify-between">
                   <span className="font-black text-primary">{formatSYP(o.total)}</span>
-                  {next[o.status] && (
+                  {!o.driverId ? (
+                    <Button onClick={() => acceptOrder(o.id, DRIVER_ID)} className="bg-gradient-hero text-white gap-2">
+                      <CheckCheck className="w-4 h-4" /> قبول الطلب
+                    </Button>
+                  ) : next[o.status] && (
                     <Button onClick={() => updateOrderStatus(o.id, next[o.status]!)} className="bg-gradient-hero text-white gap-2">
                       {o.status === "جاري التوصيل" ? <><CheckCircle2 className="w-4 h-4" /> تأكيد التسليم</> : <><Navigation className="w-4 h-4" /> {next[o.status]}</>}
                     </Button>

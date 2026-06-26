@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useState } from "react";
 import { toast } from "sonner";
 
-const statuses: OrderStatus[] = ["جديد", "قيد التحضير", "جاري التوصيل", "تم التسليم"];
+const statuses: OrderStatus[] = ["جديد", "مقبول", "قيد التحضير", "جاري التوصيل", "تم التسليم"];
 const iconChoices = ["UtensilsCrossed", "Pizza", "IceCream", "ShoppingBasket", "Flame", "Coffee", "Tag"];
 
 export function AdminDashboard() {
@@ -93,6 +93,10 @@ export function AdminDashboard() {
                     <div className="font-black">طلب #{o.id} - {o.customer}</div>
                     <div className="text-xs text-muted-foreground">{o.phone} · {o.address}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">{o.createdAt}</div>
+                    <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap gap-2">
+                      <span>💳 {o.paymentMethod}</span>
+                      {o.driverId ? <span>🛵 {o.driverId}</span> : <span className="text-amber-600">⏳ بانتظار سائق</span>}
+                    </div>
                   </div>
                   <div className="text-left">
                     <div className="font-black text-primary">{formatSYP(o.total)}</div>
