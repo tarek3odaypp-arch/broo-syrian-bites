@@ -161,3 +161,11 @@ on conflict (key) do nothing;
 insert into public.chat_messages (from_role, text) values
   ('support','أهلاً بك في دعم BROO! كيف يمكننا مساعدتك؟')
 on conflict do nothing;
+
+-- =====================================================================
+-- MIGRATION (June 2026): driver assignment + payment method on orders
+-- Safe to re-run.
+-- =====================================================================
+alter table public.orders add column if not exists driver_id text;
+alter table public.orders add column if not exists payment_method text default 'نقدي';
+-- widen status check (no-op if no constraint exists)

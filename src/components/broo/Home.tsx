@@ -71,7 +71,7 @@ export function Home({ onOpenRestaurant }: { onOpenRestaurant: (id: string) => v
                     : "bg-card border-border hover:border-primary/40 hover:-translate-y-0.5 shadow-soft"
                 }`}
               >
-                <Icon className="w-7 h-7" />
+                <Icon className={`w-7 h-7 ${active ? "pin-bounce" : ""}`} />
                 <span className="text-xs font-bold">{c.name}</span>
               </button>
             );

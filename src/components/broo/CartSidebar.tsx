@@ -1,8 +1,8 @@
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, Banknote, Smartphone } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useApp, formatSYP } from "@/context/AppContext";
+import { useApp, formatSYP, type PaymentMethod } from "@/context/AppContext";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -11,6 +11,7 @@ export function CartSidebar() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("نقدي");
 
   const subtotal = cart.reduce((s, i) => s + i.product.price * i.qty, 0);
   const delivery = subtotal === 0 ? 0 : subtotal > 100000 ? 0 : 15000;
@@ -21,7 +22,7 @@ export function CartSidebar() {
       toast.error("الرجاء تعبئة كافة الحقول");
       return;
     }
-    placeOrder({ customer: name, phone, address });
+    placeOrder({ customer: name, phone, address, paymentMethod });
     toast.success("تم استلام طلبك! سيتواصل معك السائق قريباً");
     setName(""); setPhone(""); setAddress("");
     setCartOpen(false);
@@ -78,6 +79,26 @@ export function CartSidebar() {
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم الكامل" className="bg-background" />
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="رقم الموبايل" className="bg-background" />
                 <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="العنوان التفصيلي" className="bg-background" />
+              </div>
+
+              <div className="bg-muted/60 rounded-2xl p-4 space-y-2">
+                <h4 className="font-bold text-sm mb-2">طريقة الدفع</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["نقدي","شام كاش"] as PaymentMethod[]).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setPaymentMethod(m)}
+                      className={`h-12 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                        paymentMethod === m
+                          ? "bg-gradient-hero text-white border-transparent shadow-soft"
+                          : "bg-background border-border text-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {m === "نقدي" ? <Banknote className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+                      {m}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

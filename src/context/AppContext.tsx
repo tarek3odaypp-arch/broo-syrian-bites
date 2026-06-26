@@ -51,7 +51,8 @@ export type Profile = {
 
 export type CartItem = { product: Product; qty: number };
 
-export type OrderStatus = "جديد" | "قيد التحضير" | "جاري التوصيل" | "تم التسليم";
+export type OrderStatus = "جديد" | "مقبول" | "قيد التحضير" | "جاري التوصيل" | "تم التسليم";
+export type PaymentMethod = "نقدي" | "شام كاش";
 
 export type Order = {
   id: string;
@@ -62,6 +63,8 @@ export type Order = {
   total: number;
   status: OrderStatus;
   createdAt: string;
+  driverId: string | null;
+  paymentMethod: PaymentMethod;
 };
 
 const initialRestaurants: Restaurant[] = [
@@ -102,7 +105,7 @@ const initialOrders: Order[] = [];
 // ---------- Supabase row <-> app type mappers ----------
 type RestaurantRow = { id: string; name: string; category: string; rating: number; delivery_time: string; image: string; tagline: string };
 type ProductRow = { id: string; restaurant_id: string; name: string; description: string; price: number; image: string };
-type OrderRow = { id: string; customer: string; phone: string; address: string; items: CartItem[]; total: number; status: OrderStatus; created_at: string };
+type OrderRow = { id: string; customer: string; phone: string; address: string; items: CartItem[]; total: number; status: OrderStatus; created_at: string; driver_id: string | null; payment_method: PaymentMethod | null };
 type ChatRow = { id: string; from_role: "customer" | "support"; text: string; created_at: string };
 type SettingRow = { key: string; value: unknown };
 type ProfileRow = { id: string; name: string; phone: string; password: string; address: string | null; status: ProfileStatus; created_at: string };
@@ -119,6 +122,8 @@ const toOrder = (o: OrderRow): Order => ({
   id: o.id, customer: o.customer, phone: o.phone, address: o.address,
   items: o.items, total: Number(o.total), status: o.status,
   createdAt: new Date(o.created_at).toLocaleString("ar-SY"),
+  driverId: o.driver_id ?? null,
+  paymentMethod: (o.payment_method as PaymentMethod) ?? "نقدي",
 });
 const toChat = (m: ChatRow): ChatMessage => ({
   id: m.id, from: m.from_role, text: m.text,
@@ -160,7 +165,8 @@ type AppState = {
   updateQty: (id: string, qty: number) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
-  placeOrder: (info: { customer: string; phone: string; address: string }) => void;
+  placeOrder: (info: { customer: string; phone: string; address: string; paymentMethod: PaymentMethod }) => void;
+  acceptOrder: (id: string, driverId: string) => void;
   upsertProduct: (p: Product) => void;
   deleteProduct: (id: string) => void;
   upsertCategory: (c: Category) => void;
@@ -335,7 +341,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const total = cart.reduce((s, i) => s + i.product.price * i.qty, 0);
       const order: Order = {
         id: "o" + Math.floor(Math.random() * 9000 + 1000),
-        ...info,
+        customer: info.customer, phone: info.phone, address: info.address,
+        paymentMethod: info.paymentMethod,
+        driverId: null,
         items: cart,
         total,
         status: "جديد",
@@ -346,7 +354,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       void supabase.from("orders").insert({
         id: order.id, customer: order.customer, phone: order.phone, address: order.address,
         items: order.items, total: order.total, status: order.status,
+        payment_method: order.paymentMethod, driver_id: null,
       });
+    },
+    acceptOrder: (id, driverId) => {
+      setOrders((arr) => arr.map((o) => o.id === id ? { ...o, status: "مقبول", driverId } : o));
+      void supabase.from("orders").update({ status: "مقبول", driver_id: driverId }).eq("id", id);
     },
     upsertProduct: (p) => {
       setProducts((arr) => {
