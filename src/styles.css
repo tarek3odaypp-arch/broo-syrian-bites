@@ -195,6 +195,7 @@
   background-image: var(--gradient-header);
 }
 @utility text-brand-gold { color: var(--brand-gold); }
+@utility bg-brand-gold { background-color: var(--brand-gold); }
 
 @keyframes pin-glow {
   0%, 100% { filter: drop-shadow(0 0 2px var(--brand-gold)) drop-shadow(0 0 6px oklch(0.78 0.16 80 / 0.55)); transform: scale(1); }
