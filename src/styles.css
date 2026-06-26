@@ -183,3 +183,41 @@
 @utility animate-marquee {
   animation: marquee-rtl 35s linear infinite;
 }
+
+/* ---------- BROO brand: gold pin glow + micro bounce + splash ---------- */
+:root {
+  --brand-deep: oklch(0.32 0.04 220);   /* deep teal / slate */
+  --brand-deeper: oklch(0.24 0.04 230);
+  --brand-gold: oklch(0.78 0.16 80);    /* warm gold */
+  --gradient-header: linear-gradient(120deg, var(--brand-deep), var(--brand-deeper));
+}
+@utility bg-gradient-header {
+  background-image: var(--gradient-header);
+}
+@utility text-brand-gold { color: var(--brand-gold); }
+
+@keyframes pin-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--brand-gold)) drop-shadow(0 0 6px oklch(0.78 0.16 80 / 0.55)); transform: scale(1); }
+  50%      { filter: drop-shadow(0 0 6px var(--brand-gold)) drop-shadow(0 0 14px oklch(0.78 0.16 80 / 0.85)); transform: scale(1.06); }
+}
+@utility pin-glow { animation: pin-glow 2.4s ease-in-out infinite; }
+
+@keyframes pin-bounce {
+  0%   { transform: translateY(0)    scale(1); }
+  40%  { transform: translateY(-4px) scale(1.18); }
+  70%  { transform: translateY(1px)  scale(0.96); }
+  100% { transform: translateY(0)    scale(1); }
+}
+@utility pin-bounce { animation: pin-bounce 520ms cubic-bezier(.34,1.56,.64,1); }
+
+@keyframes splash-pop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@utility splash-pop { animation: splash-pop 1100ms cubic-bezier(.2,.8,.2,1) both; }
+
+@keyframes splash-fadeout {
+  to { opacity: 0; visibility: hidden; }
+}
+@utility splash-fadeout { animation: splash-fadeout 500ms ease-in 1.5s forwards; }
