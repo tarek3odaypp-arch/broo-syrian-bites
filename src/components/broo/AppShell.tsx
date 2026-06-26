@@ -11,12 +11,28 @@ import { DriverDashboard } from "./DriverDashboard";
 import { AdminDashboard } from "./AdminDashboard";
 import { ChatWidget } from "./ChatWidget";
 import { RoleSwitcher } from "./RoleSwitcher";
+import { SplashScreen } from "./SplashScreen";
 import { Toaster } from "@/components/ui/sonner";
 
 export function AppShell() {
   const { role } = useApp();
   const [activeRestaurant, setActiveRestaurant] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [splash, setSplash] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !window.sessionStorage.getItem("broo_splash_seen");
+  });
+
+  if (splash) {
+    return (
+      <SplashScreen
+        onDone={() => {
+          window.sessionStorage.setItem("broo_splash_seen", "1");
+          setSplash(false);
+        }}
+      />
+    );
+  }
 
   if (role === "driver") return (<><DriverDashboard /><RoleSwitcher /><Toaster position="top-center" richColors /></>);
   if (role === "admin") return (<><AdminDashboard /><RoleSwitcher /><Toaster position="top-center" richColors /></>);
